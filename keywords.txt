@@ -1,0 +1,43 @@
+#######################################
+# Syntax Coloring Map For Lcd50530
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+Lcd50530	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+begin	KEYWORD2
+clear	KEYWORD2
+home	KEYWORD2
+write	KEYWORD2
+cursor	KEYWORD2
+noCursor	KEYWORD2
+blink	KEYWORD2
+noBlink	KEYWORD2
+cursorStyle	KEYWORD2
+display	KEYWORD2
+noDisplay	KEYWORD2
+setCursor	KEYWORD2
+getCursor	KEYWORD2
+underline	KEYWORD2
+noUnderline	KEYWORD2
+clearUnderline	KEYWORD2
+clearUnderlineInc	KEYWORD2
+setUnderline	KEYWORD2
+setUnderlineInc	KEYWORD2
+blinkFreq	KEYWORD2
+createChar	KEYWORD2
+scrollDisplayRigth	KEYWORD2
+scrollDisplayLeft	KEYWORD2
+nop	KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+
