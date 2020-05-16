@@ -6,6 +6,14 @@
 
 #define byte uint8_t
 
+// Internal definitions THERY ARE NOT PORTS
+#define IOC1 8
+#define IOC2 9
+#define RW   10
+#define ENA  11
+#define ENABLE_LOW  *_lcd_port[ENA] &= ~_lcd_mask[ENA]
+#define ENABLE_HIGH *_lcd_port[ENA] |= _lcd_mask[ENA]
+
 class Lcd50530 : public Print {
   public:
     Lcd50530(byte _ioc1pin, byte _ioc2pin, byte _rwpin, byte _enablepin,
@@ -44,6 +52,10 @@ class Lcd50530 : public Print {
     void nop(void);
     
   private:
+    void _assign_pins(void);
+    void _semiPulse(void);
+    void dataPinWrite(uint8_t pin, bool value);
+    bool dataPinRead(uint8_t pin);
     void SetFunctionMode(bool _8bits);
     void pulseEnable(void);
     void write8bits(byte value);
@@ -68,6 +80,18 @@ class Lcd50530 : public Print {
     bool cUnd;
     bool cOld;
     bool displayOn;
+    volatile uint8_t *_lcd_port[12];  // 8 data port + ico1 + ioc2 + rw + ena
+    uint8_t _lcd_mask[12];
+    volatile uint8_t *_data_read_port[8];
+
+    /*volatile uint8_t *_ioc1_port;
+    uint8_t _ioc1_mask;
+    volatile uint8_t *_ioc2_port;
+    uint8_t _ioc2_mask;
+    volatile uint8_t *_rw_port;
+    uint8_t _rw_mask;
+    volatile uint8_t *_ena_port;
+    uint8_t _ena_mask;*/
 };
 
 #endif

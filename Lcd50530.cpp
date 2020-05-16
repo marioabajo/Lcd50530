@@ -58,6 +58,7 @@ Lcd50530::Lcd50530(byte _ioc1pin, byte _ioc2pin, byte _rwpin, byte _enablepin,
   data[7]=d7;
   _8bits=1;
 
+  _assign_pins();
 }
 
 Lcd50530::Lcd50530(byte _ioc1pin, byte _ioc2pin, byte _rwpin, byte _enablepin,
@@ -77,6 +78,7 @@ Lcd50530::Lcd50530(byte _ioc1pin, byte _ioc2pin, byte _rwpin, byte _enablepin,
   data[7]=d7;
   _8bits=0;
 
+  _assign_pins();
 }
 
 /**************** HIGH LEVEL FUNCTIONS ***********************/
@@ -201,11 +203,13 @@ void Lcd50530::write(byte c)
   /* Get cursor address */
   addr=recvcmd(3);
   /* if the cursor pass the limit, put in the next line*/
-  if (addr!= 0 && addr % 24 == 0)
+  if ((addr!= 0) && (addr % 24) == 0)
+  {
     if (addr>=168)
       sendcmd(24,3);
     else
       sendcmd(addr+24,3);
+  }
 #if defined(ARDUINO) && ARDUINO >= 100
   return 1;
 #endif
@@ -275,7 +279,6 @@ void Lcd50530::clear(void)
 /* Clear display */
 {
   sendcmd(1,0);
-  delay(2);
 }
 
 void Lcd50530::underline(void)
@@ -332,14 +335,55 @@ void Lcd50530::nop(void)
 
 /**************** LOW LEVEL FUNCTIONS ************************/
 
+void Lcd50530::_assign_pins(void)
+{
+  uint8_t i; 
+ 
+  for (i=4*(!_8bits);i<8;i++)
+  {
+    _lcd_port[i]=portOutputRegister(digitalPinToPort(data[i]));
+    _lcd_mask[i]=digitalPinToBitMask(data[i]);
+    _data_read_port[i]=portInputRegister(digitalPinToPort(data[i]));
+  }
+  _lcd_port[IOC1]=portOutputRegister(digitalPinToPort(ioc1));
+  _lcd_port[IOC2]=portOutputRegister(digitalPinToPort(ioc2));
+  _lcd_port[RW]=portOutputRegister(digitalPinToPort(rw));
+  _lcd_port[ENA]=portOutputRegister(digitalPinToPort(ena));
+  _lcd_mask[IOC1]=digitalPinToBitMask(ioc1);
+  _lcd_mask[IOC2]=digitalPinToBitMask(ioc2);
+  _lcd_mask[RW]=digitalPinToBitMask(rw);
+  _lcd_mask[ENA]=digitalPinToBitMask(ena);
+}
+
+void Lcd50530::_semiPulse(void)
+{
+  ENABLE_LOW;
+  _delay_us(1);
+  ENABLE_HIGH;
+  _delay_us(1);
+}
+
+void Lcd50530::dataPinWrite(uint8_t pin, bool value)
+/* Fast digitalWrite */
+{
+  if (value)
+    *_lcd_port[pin] |= _lcd_mask[pin];
+  else
+    *_lcd_port[pin] &= ~_lcd_mask[pin];
+}
+
+bool Lcd50530::dataPinRead(uint8_t pin)
+/* Fast digitalRead */
+{
+  return *_data_read_port[pin] & _lcd_mask[pin];
+}
+
 void Lcd50530::pulseEnable(void)
 {
-  digitalWrite(ena, LOW);
-  delayMicroseconds(1);
-  digitalWrite(ena, HIGH);
-  delayMicroseconds(1);
-  digitalWrite(ena, LOW);
-  delayMicroseconds(50);
+  _semiPulse();
+
+  ENABLE_LOW;
+  _delay_us(1);
 }
 
 void Lcd50530::write8bits(byte value)
@@ -348,7 +392,7 @@ void Lcd50530::write8bits(byte value)
   for (byte i=0;i<8;i++)
   {
     pinMode(data[i],OUTPUT);
-    digitalWrite(data[i],(value >> i) & 0x01);
+    dataPinWrite(i, ((value >> i) & 0x01));
   }
   
   pulseEnable();
@@ -360,15 +404,15 @@ void Lcd50530::write4bits(byte value)
   for (byte i=4;i<8;i++)
   {
     pinMode(data[i],OUTPUT);
-    digitalWrite(data[i],(value >> i) & 0x01);
+    dataPinWrite(i, ((value >> i) & 0x01));
   }
   
   pulseEnable();
-  delayMicroseconds(50);
+  _delay_us(50);
 
   for (byte i=0;i<4;i++)
   {
-    digitalWrite(data[i+4],(value >> i) & 0x01);
+    dataPinWrite(i+4, ((value >> i) & 0x01));
   }
 
   pulseEnable();
@@ -378,30 +422,24 @@ byte Lcd50530::read4bits(void)
 /* Read data from the lcd in 4bit bus mode */
 {
   byte value=0;
- 
-  digitalWrite(ena, LOW);
-  delayMicroseconds(1);
-  digitalWrite(ena, HIGH);
-  delayMicroseconds(1);
+
+  _semiPulse(); 
   
   for (byte i=4;i<8;i++)
   {
     pinMode(data[i],INPUT);
-    value+=digitalRead(data[i]) << i;
+    value += dataPinRead(i);
   }
 
-  digitalWrite(ena, LOW);
-  delayMicroseconds(50);
-  digitalWrite(ena, HIGH);
-  delayMicroseconds(1);
+  _semiPulse(); 
   
   for (byte i=0;i<4;i++)
   {
-    value+=digitalRead(data[i+4]) << i;
+    value += dataPinRead(i+4);
   }
 
-  digitalWrite(ena, LOW);
-  delayMicroseconds(1);
+  ENABLE_LOW;
+  _delay_us(1);
 
   return value;
 }
@@ -411,20 +449,16 @@ byte Lcd50530::read8bits(void)
 {
   byte value=0;
 
-  digitalWrite(ena, LOW);
-  delayMicroseconds(1);
-  digitalWrite(ena, HIGH);
-  delayMicroseconds(1);
+  _semiPulse(); 
 
-  
   for (byte i=0;i<8;i++)
   {
     pinMode(data[i],INPUT);
-    value+=digitalRead(data[i]) << i;
+    value += dataPinRead(i);
   }
 
-  digitalWrite(ena, LOW);
-  delayMicroseconds(50);
+  ENABLE_LOW;
+  _delay_us(1);
   
   return value;
 }
@@ -435,19 +469,16 @@ byte Lcd50530::readFlags(void)
   bool busy_flag;
   bool _4m2_flag;
 
-  digitalWrite(ioc1,0);
-  digitalWrite(ioc2,0);
-  digitalWrite(rw,HIGH);
+  dataPinWrite(IOC1,0);
+  dataPinWrite(IOC2,0);
+  dataPinWrite(RW,1);
 
-  digitalWrite(ena, LOW);
-  delayMicroseconds(1);
-  digitalWrite(ena, HIGH);
-  delayMicroseconds(1);
+  _semiPulse(); 
 
   pinMode(data[7],INPUT);
-  busy_flag=digitalRead(data[7]);
+  busy_flag = dataPinRead(7);
   pinMode(data[6],INPUT);
-  _4m2_flag=digitalRead(data[6]);
+  _4m2_flag = dataPinRead(6);
 
   /* This is a litle hack. When the display initializes, sometimes the internal
   processor is waiting for the second nibble (4bits) of the command instead of 
@@ -457,12 +488,12 @@ byte Lcd50530::readFlags(void)
   can execute correctly. */
   if (! _4m2_flag)
   {
-    digitalWrite(ena, LOW);
-    delayMicroseconds(50);
-    digitalWrite(ena, HIGH);
-    delayMicroseconds(20);
-    digitalWrite(ena, LOW);
-    delayMicroseconds(50);
+    ENABLE_LOW;
+    _delay_us(50);
+    ENABLE_HIGH;
+    _delay_us(20);
+    ENABLE_LOW;
+    _delay_us(50);
   }
 
   return busy_flag + (_4m2_flag << 1);
@@ -485,9 +516,9 @@ void Lcd50530::sendcmd(byte value, byte mode)
 {
   while (readBusy());
 
-  digitalWrite(ioc1,mode & 0x01);
-  digitalWrite(ioc2,mode & 0x02);
-  digitalWrite(rw,LOW);
+  dataPinWrite(IOC1,mode & 0x01);
+  dataPinWrite(IOC2,mode & 0x02);
+  dataPinWrite(RW,0);
   
   if (_8bits)
     write8bits(value);
@@ -500,9 +531,9 @@ byte Lcd50530::recvcmd(byte mode)
 {
   while (readBusy());
 
-  digitalWrite(ioc1,mode & 0x01);
-  digitalWrite(ioc2,mode & 0x02);
-  digitalWrite(rw,HIGH);
+  dataPinWrite(IOC1,mode & 0x01);
+  dataPinWrite(IOC2,mode & 0x02);
+  dataPinWrite(RW,1);
   
   if (_8bits)
     return read8bits();
